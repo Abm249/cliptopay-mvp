@@ -12,9 +12,9 @@ model User {
   name          String?
   email         String?  @unique
   image         String?
-  role          Role     @default(USER)
+  role          String   @default("USER") // replaced enum Role
   reputation    Int      @default(0)
-  niches        String[] @default([]) // tags/niches of interest
+  niches        String   @default("")     // replaced String[] with single string (comma separated)
   accounts      Account[]
   sessions      Session[]
   projects      Project[] @relation("CreatorProjects")
@@ -23,11 +23,6 @@ model User {
   disputes      Dispute[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-}
-
-enum Role {
-  USER
-  ADMIN
 }
 
 model Account {
@@ -74,19 +69,13 @@ model Project {
   sourceUrl   String
   cpmUSD      Float
   maxClips    Int
-  status      ProjectStatus @default(OPEN)
-  tags        String[]
+  status      String    @default("OPEN") // replaced enum ProjectStatus
+  tags        String    @default("")     // replaced String[] with single string (comma separated)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   clips       Clip[]
   approvals   Approval[]
   disputes    Dispute[]
-}
-
-enum ProjectStatus {
-  OPEN
-  IN_PROGRESS
-  CLOSED
 }
 
 model Clip {
@@ -108,18 +97,12 @@ model Approval {
   projectId  String
   clipId     String?
   approverId String
-  status     ApprovalStatus
+  status     String   @default("PENDING") // replaced enum ApprovalStatus
   note       String?
   createdAt  DateTime @default(now())
   project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   clip       Clip?    @relation(fields: [clipId], references: [id])
   approver   User     @relation(fields: [approverId], references: [id])
-}
-
-enum ApprovalStatus {
-  PENDING
-  APPROVED
-  REJECTED
 }
 
 model Dispute {
@@ -128,17 +111,11 @@ model Dispute {
   clipId     String
   raisedById String
   reason     String
-  status     DisputeStatus @default(OPEN)
+  status     String   @default("OPEN") // replaced enum DisputeStatus
   createdAt  DateTime @default(now())
   project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   clip       Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
   raisedBy   User     @relation(fields: [raisedById], references: [id])
-}
-
-enum DisputeStatus {
-  OPEN
-  RESOLVED
-  REJECTED
 }
 
 /// Append-only ledger with hash chaining for immutability
