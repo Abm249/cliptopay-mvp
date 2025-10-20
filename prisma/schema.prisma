@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String?
+  email         String?  @unique
+  image         String?
+  role          Role     @default(USER)
+  reputation    Int      @default(0)
+  niches        String[] @default([]) // tags/niches of interest
+  accounts      Account[]
+  sessions      Session[]
+  projects      Project[] @relation("CreatorProjects")
+  clips         Clip[]
+  approvals     Approval[]
+  disputes      Dispute[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Project {
+  id          String    @id @default(cuid())
+  creatorId   String
+  creator     User      @relation("CreatorProjects", fields: [creatorId], references: [id], onDelete: Cascade)
+  title       String
+  brief       String
+  sourceUrl   String
+  cpmUSD      Float
+  maxClips    Int
+  status      ProjectStatus @default(OPEN)
+  tags        String[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  clips       Clip[]
+  approvals   Approval[]
+  disputes    Dispute[]
+}
+
+enum ProjectStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
+model Clip {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  clipperId  String
+  clipper    User     @relation(fields: [clipperId], references: [id], onDelete: Cascade)
+  url        String
+  platform   String
+  views      Int      @default(0)
+  approved   Boolean  @default(false)
+  earnings   Float    @default(0)
+  createdAt  DateTime @default(now())
+}
+
+model Approval {
+  id         String   @id @default(cuid())
+  projectId  String
+  clipId     String?
+  approverId String
+  status     ApprovalStatus
+  note       String?
+  createdAt  DateTime @default(now())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  clip       Clip?    @relation(fields: [clipId], references: [id])
+  approver   User     @relation(fields: [approverId], references: [id])
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Dispute {
+  id         String   @id @default(cuid())
+  projectId  String
+  clipId     String
+  raisedById String
+  reason     String
+  status     DisputeStatus @default(OPEN)
+  createdAt  DateTime @default(now())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  clip       Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  raisedBy   User     @relation(fields: [raisedById], references: [id])
+}
+
+enum DisputeStatus {
+  OPEN
+  RESOLVED
+  REJECTED
+}
+
+/// Append-only ledger with hash chaining for immutability
+model PayoutLedger {
+  id           String   @id @default(cuid())
+  clipId       String
+  clip         Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  amountUSD    Float
+  event        String   // e.g., CALCULATED, ADJUSTMENT, PAID
+  prevHash     String?
+  entryHash    String
+  createdAt    DateTime @default(now())
+}
