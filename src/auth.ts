@@ -1,5 +1,4 @@
 import NextAuth from "next-auth";
-import TikTok from "next-auth/providers/tiktok";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/server/db";
@@ -21,7 +20,7 @@ declare module "next-auth" {
       role?: "USER" | "ADMIN";
       niches?: string[];
       reputation?: number;
-    }
+    };
   }
 }
 
@@ -29,33 +28,42 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "database" },
   adapter: PrismaAdapter(prisma),
   providers: [
-    TikTok,
     Credentials({
       name: "Email + Password",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
       },
       authorize: async (creds) => {
         const schema = z.object({
           email: z.string().email(),
-          password: z.string().min(6)
+          password: z.string().min(6),
         });
         const parsed = schema.safeParse(creds);
         if (!parsed.success) return null;
         const { email, password } = parsed.data;
+
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) return null;
-        // Simple demo: store hashed password in Account table as id_token (not ideal)
+
         const account = await prisma.account.findFirst({
-          where: { userId: user.id, provider: "credentials" }
+          where: { userId: user.id, provider: "credentials" },
         });
         if (!account?.id_token) return null;
+
         const ok = await bcrypt.compare(password, account.id_token);
         if (!ok) return null;
-        return { id: user.id, name: user.name ?? null, email: user.email ?? null, role: user.role, niches: user.niches, reputation: user.reputation };
-      }
-    })
+
+        return {
+          id: user.id,
+          name: user.name ?? null,
+          email: user.email ?? null,
+          role: user.role,
+          niches: user.niches,
+          reputation: user.reputation,
+        };
+      },
+    }),
   ],
   callbacks: {
     async session({ session, user }) {
@@ -69,6 +77,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.reputation = (user as any).reputation;
       }
       return session;
-    }
-  }
+    },
+  },
 });
